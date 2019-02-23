@@ -37,7 +37,7 @@ func NewErrorReadCloser(err error) io.ReadCloser {
 
 func TestBodyParser(t *testing.T) {
 	t.Run("skip", func(t *testing.T) {
-		bodyParser := NewBodyParser(Config{
+		bodyParser := New(Config{
 			Skipper: func(c *cod.Context) bool {
 				return true
 			},
@@ -62,7 +62,7 @@ func TestBodyParser(t *testing.T) {
 	})
 
 	t.Run("request body is not nil", func(t *testing.T) {
-		bodyParser := NewDefaultBodyParser()
+		bodyParser := NewDefault()
 
 		body := `{"name": "tree.xie"}`
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
@@ -84,7 +84,7 @@ func TestBodyParser(t *testing.T) {
 	})
 
 	t.Run("pass method", func(t *testing.T) {
-		bodyParser := NewBodyParser(Config{})
+		bodyParser := New(Config{})
 		req := httptest.NewRequest("GET", "https://aslant.site/", nil)
 		c := cod.NewContext(nil, req)
 		done := false
@@ -102,7 +102,7 @@ func TestBodyParser(t *testing.T) {
 	})
 
 	t.Run("pass content type not json", func(t *testing.T) {
-		bodyParser := NewBodyParser(Config{})
+		bodyParser := New(Config{})
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader("abc"))
 		c := cod.NewContext(nil, req)
 		done := false
@@ -120,7 +120,7 @@ func TestBodyParser(t *testing.T) {
 	})
 
 	t.Run("read body fail", func(t *testing.T) {
-		bodyParser := NewBodyParser(Config{})
+		bodyParser := New(Config{})
 		req := httptest.NewRequest("POST", "https://aslant.site/", NewErrorReadCloser(hes.New("abc")))
 		req.Header.Set(cod.HeaderContentType, "application/json")
 		c := cod.NewContext(nil, req)
@@ -131,7 +131,7 @@ func TestBodyParser(t *testing.T) {
 	})
 
 	t.Run("body over limit size", func(t *testing.T) {
-		bodyParser := NewBodyParser(Config{
+		bodyParser := New(Config{
 			Limit: 1,
 		})
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader("abc"))
@@ -144,7 +144,7 @@ func TestBodyParser(t *testing.T) {
 	})
 
 	t.Run("ignore json and content type is json", func(t *testing.T) {
-		bodyParser := NewBodyParser(Config{
+		bodyParser := New(Config{
 			IgnoreJSON: true,
 		})
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader("abc"))
@@ -168,7 +168,7 @@ func TestBodyParser(t *testing.T) {
 	})
 
 	t.Run("ignore form url encoded and content type is form url encoded", func(t *testing.T) {
-		bodyParser := NewBodyParser(Config{
+		bodyParser := New(Config{
 			IgnoreFormURLEncoded: true,
 		})
 		body := `name=tree.xie&type=1`
@@ -193,7 +193,7 @@ func TestBodyParser(t *testing.T) {
 	})
 
 	t.Run("parse json success", func(t *testing.T) {
-		bodyParser := NewBodyParser(Config{})
+		bodyParser := New(Config{})
 		body := `{"name": "tree.xie"}`
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
 		req.Header.Set(cod.HeaderContentType, "application/json")
@@ -216,7 +216,7 @@ func TestBodyParser(t *testing.T) {
 	})
 
 	t.Run("parse form url encoded success", func(t *testing.T) {
-		bodyParser := NewBodyParser(Config{})
+		bodyParser := New(Config{})
 		body := `name=tree.xie&type=1&type=2`
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
 		req.Header.Set(cod.HeaderContentType, "application/x-www-form-urlencoded")

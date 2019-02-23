@@ -52,15 +52,15 @@ var (
 	}
 )
 
-// NewDefaultBodyParser create a default body parser, default limit and only json parser
-func NewDefaultBodyParser() cod.Handler {
-	return NewBodyParser(Config{
+// NewDefault create a default body parser, default limit and only json parser
+func NewDefault() cod.Handler {
+	return New(Config{
 		IgnoreFormURLEncoded: true,
 	})
 }
 
-// NewBodyParser create a body parser
-func NewBodyParser(config Config) cod.Handler {
+// New create a body parser
+func New(config Config) cod.Handler {
 	limit := defaultRequestBodyLimit
 	if config.Limit != 0 {
 		limit = config.Limit
