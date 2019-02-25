@@ -1,6 +1,8 @@
 # cod-body-parser
 
-Body parser for cod.
+[![Build Status](https://img.shields.io/travis/vicanso/cod-body-parser.svg?label=linux+build)](https://travis-ci.org/vicanso/cod-body-parser)
+
+Body parser for cod. It support `application/json` and `application/x-www-form-urlencoded` type, but `NewDefault` just support `application/json`.
 
 ```go
 package main
@@ -14,9 +16,6 @@ import (
 
 func main() {
 	d := cod.New()
-	d.Keys = []string{
-		"cuttlefish",
-	}
 
 	d.Use(bodyparser.NewDefault())
 

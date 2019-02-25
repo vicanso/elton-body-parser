@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	// ErrCategoryBodyParser body parser error category
-	ErrCategoryBodyParser = "cod-body-parser"
+	// ErrCategory body parser error category
+	ErrCategory = "cod-body-parser"
 	// 默认为50kb
 	defaultRequestBodyLimit   = 50 * 1024
 	jsonContentType           = "application/json"
@@ -37,8 +37,11 @@ const (
 type (
 	// Config json parser config
 	Config struct {
-		Limit                int
-		IgnoreJSON           bool
+		// Limit the limit size of body
+		Limit int
+		// IgnoreJSON ignore json type
+		IgnoreJSON bool
+		// IgnoreFormURLEncoded ignore form url encoded type
 		IgnoreFormURLEncoded bool
 		Skipper              cod.Skipper
 	}
@@ -110,9 +113,9 @@ func New(config Config) cod.Handler {
 			// IO 读取失败的认为是 exception
 			err = &hes.Error{
 				Exception:  true,
-				StatusCode: http.StatusBadRequest,
+				StatusCode: http.StatusInternalServerError,
 				Message:    e.Error(),
-				Category:   ErrCategoryBodyParser,
+				Category:   ErrCategory,
 				Err:        e,
 			}
 			return
@@ -121,7 +124,7 @@ func New(config Config) cod.Handler {
 			err = &hes.Error{
 				StatusCode: http.StatusBadRequest,
 				Message:    fmt.Sprintf("request body is %d bytes, it should be <= %d", len(body), limit),
-				Category:   ErrCategoryBodyParser,
+				Category:   ErrCategory,
 			}
 			return
 		}
