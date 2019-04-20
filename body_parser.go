@@ -120,6 +120,7 @@ func New(config Config) cod.Handler {
 			}
 			return
 		}
+		c.Request.Body.Close()
 		if limit > 0 && len(body) > limit {
 			err = &hes.Error{
 				StatusCode: http.StatusBadRequest,
@@ -130,28 +131,14 @@ func New(config Config) cod.Handler {
 		}
 		// 将form url encoded 数据转化为json
 		if isFormURLEncoded {
-			values := strings.Split(string(body), "&")
-			data := make(map[string][]string)
-			for _, str := range values {
-				arr := strings.Split(str, "=")
-				if len(arr) < 2 {
-					continue
-				}
-				v, _ := url.QueryUnescape(arr[1])
-				if v == "" {
-					v = arr[1]
-				}
-				k := arr[0]
-				// 因为有可能相同的key 重复出现
-				if data[k] == nil {
-					data[k] = []string{
-						v,
-					}
-				} else {
-					data[k] = append(data[k], v)
-				}
+			data, err := url.ParseQuery(string(body))
+			if err != nil {
+				he := hes.Wrap(err)
+				he.Exception = true
+				return he
 			}
-			arr := make([]string, 0, len(values))
+
+			arr := make([]string, 0, len(data))
 			for key, values := range data {
 				if len(values) < 2 {
 					arr = append(arr, fmt.Sprintf(`"%s":"%s"`, key, values[0]))
