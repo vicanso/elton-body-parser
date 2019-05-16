@@ -1,12 +1,13 @@
 package bodyparser
 
 import (
-	"bytes"
+	"encoding/base64"
 	"io"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/vicanso/cod"
 	"github.com/vicanso/hes"
 )
@@ -37,6 +38,7 @@ func NewErrorReadCloser(err error) io.ReadCloser {
 
 func TestBodyParser(t *testing.T) {
 	t.Run("skip", func(t *testing.T) {
+		assert := assert.New(t)
 		bodyParser := New(Config{
 			Skipper: func(c *cod.Context) bool {
 				return true
@@ -53,15 +55,13 @@ func TestBodyParser(t *testing.T) {
 			return nil
 		}
 		err := bodyParser(c)
-
-		if err != nil ||
-			!done ||
-			len(c.RequestBody) != 0 {
-			t.Fatalf("skip fail")
-		}
+		assert.Nil(err)
+		assert.True(done)
+		assert.Equal(len(c.RequestBody), 0)
 	})
 
 	t.Run("request body is not nil", func(t *testing.T) {
+		assert := assert.New(t)
 		bodyParser := NewDefault()
 
 		body := `{"name": "tree.xie"}`
@@ -76,14 +76,13 @@ func TestBodyParser(t *testing.T) {
 		c.RequestBody = []byte("a")
 		err := bodyParser(c)
 
-		if err != nil ||
-			!done ||
-			!bytes.Equal(c.RequestBody, []byte("a")) {
-			t.Fatalf("request body nil should be pass")
-		}
+		assert.Nil(err)
+		assert.True(done)
+		assert.Equal(c.RequestBody, []byte("a"))
 	})
 
 	t.Run("pass method", func(t *testing.T) {
+		assert := assert.New(t)
 		bodyParser := New(Config{})
 		req := httptest.NewRequest("GET", "https://aslant.site/", nil)
 		c := cod.NewContext(nil, req)
@@ -93,15 +92,12 @@ func TestBodyParser(t *testing.T) {
 			return nil
 		}
 		err := bodyParser(c)
-		if err != nil {
-			t.Fatalf("json parse fail, %v", err)
-		}
-		if !done {
-			t.Fatalf("json parse fail")
-		}
+		assert.Nil(err)
+		assert.True(done)
 	})
 
 	t.Run("pass content type not json", func(t *testing.T) {
+		assert := assert.New(t)
 		bodyParser := New(Config{})
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader("abc"))
 		c := cod.NewContext(nil, req)
@@ -111,26 +107,23 @@ func TestBodyParser(t *testing.T) {
 			return nil
 		}
 		err := bodyParser(c)
-		if err != nil {
-			t.Fatalf("body parse fail, %v", err)
-		}
-		if !done {
-			t.Fatalf("body parse fail")
-		}
+		assert.Nil(err)
+		assert.True(done)
 	})
 
 	t.Run("read body fail", func(t *testing.T) {
+		assert := assert.New(t)
 		bodyParser := New(Config{})
 		req := httptest.NewRequest("POST", "https://aslant.site/", NewErrorReadCloser(hes.New("abc")))
 		req.Header.Set(cod.HeaderContentType, "application/json")
 		c := cod.NewContext(nil, req)
 		err := bodyParser(c)
-		if err == nil {
-			t.Fatalf("read body fail should return error")
-		}
+		assert.NotNil(err)
+		assert.Equal(err.Error(), "category=cod-body-parser, message=message=abc")
 	})
 
 	t.Run("body over limit size", func(t *testing.T) {
+		assert := assert.New(t)
 		bodyParser := New(Config{
 			Limit: 1,
 		})
@@ -138,12 +131,12 @@ func TestBodyParser(t *testing.T) {
 		req.Header.Set(cod.HeaderContentType, "application/json")
 		c := cod.NewContext(nil, req)
 		err := bodyParser(c)
-		if err == nil {
-			t.Fatalf("body over size should return error")
-		}
+		assert.NotNil(err)
+		assert.Equal(err.Error(), "category=cod-body-parser, message=request body is 3 bytes, it should be <= 1")
 	})
 
 	t.Run("ignore json and content type is json", func(t *testing.T) {
+		assert := assert.New(t)
 		bodyParser := New(Config{
 			IgnoreJSON: true,
 		})
@@ -156,18 +149,13 @@ func TestBodyParser(t *testing.T) {
 			return nil
 		}
 		err := bodyParser(c)
-		if err != nil {
-			t.Fatalf("body parse fail, %v", err)
-		}
-		if !done {
-			t.Fatalf("body parse fail")
-		}
-		if len(c.RequestBody) != 0 {
-			t.Fatalf("body parse shoudl be pass")
-		}
+		assert.Nil(err)
+		assert.True(done)
+		assert.Equal(len(c.RequestBody), 0)
 	})
 
 	t.Run("ignore form url encoded and content type is form url encoded", func(t *testing.T) {
+		assert := assert.New(t)
 		bodyParser := New(Config{
 			IgnoreFormURLEncoded: true,
 		})
@@ -181,18 +169,13 @@ func TestBodyParser(t *testing.T) {
 			return nil
 		}
 		err := bodyParser(c)
-		if err != nil {
-			t.Fatalf("form url encoded parse fail, %v", err)
-		}
-		if !done {
-			t.Fatalf("form url encoded parse fail")
-		}
-		if len(c.RequestBody) != 0 {
-			t.Fatalf("body parse should be pass")
-		}
+		assert.Nil(err)
+		assert.True(done)
+		assert.Equal(len(c.RequestBody), 0)
 	})
 
 	t.Run("parse json success", func(t *testing.T) {
+		assert := assert.New(t)
 		bodyParser := New(Config{})
 		body := `{"name": "tree.xie"}`
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
@@ -207,15 +190,40 @@ func TestBodyParser(t *testing.T) {
 			return nil
 		}
 		err := bodyParser(c)
-		if err != nil {
-			t.Fatalf("json parse fail, %v", err)
+		assert.Nil(err)
+		assert.True(done)
+	})
+
+	t.Run("decode data success", func(t *testing.T) {
+		assert := assert.New(t)
+		bodyParser := New(Config{
+			Decode: func(c *cod.Context, data []byte) ([]byte, error) {
+				if strings.HasSuffix(c.GetRequestHeader(cod.HeaderContentType), "charset=base64") {
+					return base64.RawStdEncoding.DecodeString(string(data))
+				}
+				return data, nil
+			},
+		})
+		body := `{"name": "tree.xie"}`
+		b64 := base64.RawStdEncoding.EncodeToString([]byte(body))
+		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(b64))
+		req.Header.Set(cod.HeaderContentType, "application/json;charset=base64")
+		c := cod.NewContext(nil, req)
+		done := false
+		c.Next = func() error {
+			done = true
+			if string(c.RequestBody) != body {
+				return hes.New("request body is invalid")
+			}
+			return nil
 		}
-		if !done {
-			t.Fatalf("json parse fail")
-		}
+		err := bodyParser(c)
+		assert.Nil(err)
+		assert.True(done)
 	})
 
 	t.Run("parse form url encoded success", func(t *testing.T) {
+		assert := assert.New(t)
 		bodyParser := New(Config{})
 		body := `name=tree.xie&type=1&type=2`
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
@@ -224,17 +232,13 @@ func TestBodyParser(t *testing.T) {
 		done := false
 		c.Next = func() error {
 			done = true
-			if string(c.RequestBody) != `{"name":"tree.xie","type":["1","2"]}` {
+			if len(c.RequestBody) != 36 {
 				return hes.New("request body is invalid")
 			}
 			return nil
 		}
 		err := bodyParser(c)
-		if err != nil {
-			t.Fatalf("form url encoded parse fail, %v", err)
-		}
-		if !done {
-			t.Fatalf("form url encoded parse fail")
-		}
+		assert.Nil(err)
+		assert.True(done)
 	})
 }

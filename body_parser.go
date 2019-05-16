@@ -35,6 +35,8 @@ const (
 )
 
 type (
+	// Decode body decode function
+	Decode func(c *cod.Context, originalData []byte) (data []byte, err error)
 	// Config json parser config
 	Config struct {
 		// Limit the limit size of body
@@ -43,7 +45,9 @@ type (
 		IgnoreJSON bool
 		// IgnoreFormURLEncoded ignore form url encoded type
 		IgnoreFormURLEncoded bool
-		Skipper              cod.Skipper
+		// Decode decode function
+		Decode  Decode
+		Skipper cod.Skipper
 	}
 )
 
@@ -90,9 +94,10 @@ func New(config Config) cod.Handler {
 			return c.Next()
 		}
 		ct := c.GetRequestHeader(cod.HeaderContentType)
+		ctFields := strings.Split(ct, ";")
 		// 非json则跳过
-		isJSON := strings.HasPrefix(ct, jsonContentType)
-		isFormURLEncoded := strings.HasPrefix(ct, formURLEncodedContentType)
+		isJSON := ctFields[0] == jsonContentType
+		isFormURLEncoded := ctFields[0] == formURLEncodedContentType
 
 		// 如果不是 json 也不是 form url encoded，则跳过
 		if !isJSON && !isFormURLEncoded {
@@ -128,6 +133,13 @@ func New(config Config) cod.Handler {
 				Category:   ErrCategory,
 			}
 			return
+		}
+		if config.Decode != nil {
+			// 对提交数据做decode处理（如编码转换等）
+			body, err = config.Decode(c, body)
+			if err != nil {
+				return
+			}
 		}
 		// 将form url encoded 数据转化为json
 		if isFormURLEncoded {
