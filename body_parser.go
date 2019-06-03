@@ -15,6 +15,8 @@
 package bodyparser
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -59,11 +61,32 @@ var (
 	}
 )
 
+// DefaultDecode default decode
+func DefaultDecode(c *cod.Context, data []byte) ([]byte, error) {
+	encoding := c.GetRequestHeader(cod.HeaderContentEncoding)
+	if encoding == cod.Gzip {
+		c.SetRequestHeader(cod.HeaderContentEncoding, "")
+		return doGunzip(data)
+	}
+	return data, nil
+}
+
 // NewDefault create a default body parser, default limit and only json parser
 func NewDefault() cod.Handler {
 	return New(Config{
 		IgnoreFormURLEncoded: true,
+		Decode:               DefaultDecode,
 	})
+}
+
+// doGunzip gunzip
+func doGunzip(buf []byte) ([]byte, error) {
+	r, err := gzip.NewReader(bytes.NewBuffer(buf))
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	return ioutil.ReadAll(r)
 }
 
 // New create a body parser

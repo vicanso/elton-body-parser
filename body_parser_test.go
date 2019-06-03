@@ -1,6 +1,8 @@
 package bodyparser
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/base64"
 	"io"
 	"net/http/httptest"
@@ -34,6 +36,27 @@ func NewErrorReadCloser(err error) io.ReadCloser {
 		customErr: err,
 	}
 	return r
+}
+
+func TestDefaultDecode(t *testing.T) {
+	assert := assert.New(t)
+	originalBuf := []byte("abcdabcdabcd")
+	var b bytes.Buffer
+	w, _ := gzip.NewWriterLevel(&b, 9)
+	_, err := w.Write(originalBuf)
+	assert.Nil(err)
+	w.Close()
+
+	c := cod.NewContext(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
+
+	buf, err := DefaultDecode(c, b.Bytes())
+	assert.Nil(err)
+	assert.Equal(b.Bytes(), buf)
+
+	c.SetRequestHeader(cod.HeaderContentEncoding, cod.Gzip)
+	buf, err = DefaultDecode(c, b.Bytes())
+	assert.Nil(err)
+	assert.Equal(originalBuf, buf)
 }
 
 func TestBodyParser(t *testing.T) {
