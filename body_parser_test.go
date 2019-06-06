@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -264,4 +266,21 @@ func TestBodyParser(t *testing.T) {
 		assert.Nil(err)
 		assert.True(done)
 	})
+}
+
+// https://stackoverflow.com/questions/50120427/fail-unit-tests-if-coverage-is-below-certain-percentage
+func TestMain(m *testing.M) {
+	// call flag.Parse() here if TestMain uses flags
+	rc := m.Run()
+
+	// rc 0 means we've passed,
+	// and CoverMode will be non empty if run with -cover
+	if rc == 0 && testing.CoverMode() != "" {
+		c := testing.Coverage()
+		if c < 0.9 {
+			fmt.Println("Tests passed but coverage failed at", c)
+			rc = -1
+		}
+	}
+	os.Exit(rc)
 }
