@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/vicanso/cod"
+	"github.com/vicanso/elton"
 	"github.com/vicanso/hes"
 )
 
@@ -40,7 +40,7 @@ func NewErrorReadCloser(err error) io.ReadCloser {
 	return r
 }
 
-func TestDefaultDecode(t *testing.T) {
+func TestDefaultDeeltone(t *testing.T) {
 	assert := assert.New(t)
 	originalBuf := []byte("abcdabcdabcd")
 	var b bytes.Buffer
@@ -49,14 +49,14 @@ func TestDefaultDecode(t *testing.T) {
 	assert.Nil(err)
 	w.Close()
 
-	c := cod.NewContext(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
+	c := elton.NewContext(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
 
-	buf, err := DefaultDecode(c, b.Bytes())
+	buf, err := DefaultDeeltone(c, b.Bytes())
 	assert.Nil(err)
 	assert.Equal(b.Bytes(), buf)
 
-	c.SetRequestHeader(cod.HeaderContentEncoding, cod.Gzip)
-	buf, err = DefaultDecode(c, b.Bytes())
+	c.SetRequestHeader(elton.HeaderContentEncoding, elton.Gzip)
+	buf, err = DefaultDeeltone(c, b.Bytes())
 	assert.Nil(err)
 	assert.Equal(originalBuf, buf)
 }
@@ -65,15 +65,15 @@ func TestBodyParser(t *testing.T) {
 	t.Run("skip", func(t *testing.T) {
 		assert := assert.New(t)
 		bodyParser := New(Config{
-			Skipper: func(c *cod.Context) bool {
+			Skipper: func(c *elton.Context) bool {
 				return true
 			},
 		})
 
 		body := `{"name": "tree.xie"}`
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
-		req.Header.Set(cod.HeaderContentType, "application/json")
-		c := cod.NewContext(nil, req)
+		req.Header.Set(elton.HeaderContentType, "application/json")
+		c := elton.NewContext(nil, req)
 		done := false
 		c.Next = func() error {
 			done = true
@@ -91,8 +91,8 @@ func TestBodyParser(t *testing.T) {
 
 		body := `{"name": "tree.xie"}`
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
-		req.Header.Set(cod.HeaderContentType, "application/json")
-		c := cod.NewContext(nil, req)
+		req.Header.Set(elton.HeaderContentType, "application/json")
+		c := elton.NewContext(nil, req)
 		done := false
 		c.Next = func() error {
 			done = true
@@ -110,7 +110,7 @@ func TestBodyParser(t *testing.T) {
 		assert := assert.New(t)
 		bodyParser := New(Config{})
 		req := httptest.NewRequest("GET", "https://aslant.site/", nil)
-		c := cod.NewContext(nil, req)
+		c := elton.NewContext(nil, req)
 		done := false
 		c.Next = func() error {
 			done = true
@@ -125,7 +125,7 @@ func TestBodyParser(t *testing.T) {
 		assert := assert.New(t)
 		bodyParser := New(Config{})
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader("abc"))
-		c := cod.NewContext(nil, req)
+		c := elton.NewContext(nil, req)
 		done := false
 		c.Next = func() error {
 			done = true
@@ -140,11 +140,11 @@ func TestBodyParser(t *testing.T) {
 		assert := assert.New(t)
 		bodyParser := New(Config{})
 		req := httptest.NewRequest("POST", "https://aslant.site/", NewErrorReadCloser(hes.New("abc")))
-		req.Header.Set(cod.HeaderContentType, "application/json")
-		c := cod.NewContext(nil, req)
+		req.Header.Set(elton.HeaderContentType, "application/json")
+		c := elton.NewContext(nil, req)
 		err := bodyParser(c)
 		assert.NotNil(err)
-		assert.Equal(err.Error(), "category=cod-body-parser, message=message=abc")
+		assert.Equal(err.Error(), "category=elton-body-parser, message=message=abc")
 	})
 
 	t.Run("body over limit size", func(t *testing.T) {
@@ -153,11 +153,11 @@ func TestBodyParser(t *testing.T) {
 			Limit: 1,
 		})
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader("abc"))
-		req.Header.Set(cod.HeaderContentType, "application/json")
-		c := cod.NewContext(nil, req)
+		req.Header.Set(elton.HeaderContentType, "application/json")
+		c := elton.NewContext(nil, req)
 		err := bodyParser(c)
 		assert.NotNil(err)
-		assert.Equal(err.Error(), "category=cod-body-parser, message=request body is 3 bytes, it should be <= 1")
+		assert.Equal(err.Error(), "category=elton-body-parser, message=request body is 3 bytes, it should be <= 1")
 	})
 
 	t.Run("ignore json and content type is json", func(t *testing.T) {
@@ -166,8 +166,8 @@ func TestBodyParser(t *testing.T) {
 			IgnoreJSON: true,
 		})
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader("abc"))
-		req.Header.Set(cod.HeaderContentType, "application/json")
-		c := cod.NewContext(nil, req)
+		req.Header.Set(elton.HeaderContentType, "application/json")
+		c := elton.NewContext(nil, req)
 		done := false
 		c.Next = func() error {
 			done = true
@@ -179,15 +179,15 @@ func TestBodyParser(t *testing.T) {
 		assert.Equal(len(c.RequestBody), 0)
 	})
 
-	t.Run("ignore form url encoded and content type is form url encoded", func(t *testing.T) {
+	t.Run("ignore form url eneltoned and content type is form url eneltoned", func(t *testing.T) {
 		assert := assert.New(t)
 		bodyParser := New(Config{
-			IgnoreFormURLEncoded: true,
+			IgnoreFormURLEneltoned: true,
 		})
 		body := `name=tree.xie&type=1`
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
-		req.Header.Set(cod.HeaderContentType, "application/x-www-form-urlencoded")
-		c := cod.NewContext(nil, req)
+		req.Header.Set(elton.HeaderContentType, "application/x-www-form-urleneltoned")
+		c := elton.NewContext(nil, req)
 		done := false
 		c.Next = func() error {
 			done = true
@@ -204,8 +204,8 @@ func TestBodyParser(t *testing.T) {
 		bodyParser := New(Config{})
 		body := `{"name": "tree.xie"}`
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
-		req.Header.Set(cod.HeaderContentType, "application/json")
-		c := cod.NewContext(nil, req)
+		req.Header.Set(elton.HeaderContentType, "application/json")
+		c := elton.NewContext(nil, req)
 		done := false
 		c.Next = func() error {
 			done = true
@@ -219,11 +219,11 @@ func TestBodyParser(t *testing.T) {
 		assert.True(done)
 	})
 
-	t.Run("decode data success", func(t *testing.T) {
+	t.Run("deeltone data success", func(t *testing.T) {
 		assert := assert.New(t)
 		bodyParser := New(Config{
-			Decode: func(c *cod.Context, data []byte) ([]byte, error) {
-				if strings.HasSuffix(c.GetRequestHeader(cod.HeaderContentType), "charset=base64") {
+			Deeltone: func(c *elton.Context, data []byte) ([]byte, error) {
+				if strings.HasSuffix(c.GetRequestHeader(elton.HeaderContentType), "charset=base64") {
 					return base64.RawStdEncoding.DecodeString(string(data))
 				}
 				return data, nil
@@ -232,8 +232,8 @@ func TestBodyParser(t *testing.T) {
 		body := `{"name": "tree.xie"}`
 		b64 := base64.RawStdEncoding.EncodeToString([]byte(body))
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(b64))
-		req.Header.Set(cod.HeaderContentType, "application/json;charset=base64")
-		c := cod.NewContext(nil, req)
+		req.Header.Set(elton.HeaderContentType, "application/json;charset=base64")
+		c := elton.NewContext(nil, req)
 		done := false
 		c.Next = func() error {
 			done = true
@@ -247,13 +247,13 @@ func TestBodyParser(t *testing.T) {
 		assert.True(done)
 	})
 
-	t.Run("parse form url encoded success", func(t *testing.T) {
+	t.Run("parse form url eneltoned success", func(t *testing.T) {
 		assert := assert.New(t)
 		bodyParser := New(Config{})
 		body := `name=tree.xie&type=1&type=2`
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
-		req.Header.Set(cod.HeaderContentType, "application/x-www-form-urlencoded")
-		c := cod.NewContext(nil, req)
+		req.Header.Set(elton.HeaderContentType, "application/x-www-form-urleneltoned")
+		c := elton.NewContext(nil, req)
 		done := false
 		c.Next = func() error {
 			done = true

@@ -23,33 +23,33 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/vicanso/cod"
+	"github.com/vicanso/elton"
 	"github.com/vicanso/hes"
 )
 
 const (
 	// ErrCategory body parser error category
-	ErrCategory = "cod-body-parser"
+	ErrCategory = "elton-body-parser"
 	// 默认为50kb
-	defaultRequestBodyLimit   = 50 * 1024
-	jsonContentType           = "application/json"
-	formURLEncodedContentType = "application/x-www-form-urlencoded"
+	defaultRequestBodyLimit     = 50 * 1024
+	jsonContentType             = "application/json"
+	formURLEneltonedContentType = "application/x-www-form-urleneltoned"
 )
 
 type (
-	// Decode body decode function
-	Decode func(c *cod.Context, originalData []byte) (data []byte, err error)
+	// Deeltone body deeltone function
+	Deeltone func(c *elton.Context, originalData []byte) (data []byte, err error)
 	// Config json parser config
 	Config struct {
 		// Limit the limit size of body
 		Limit int
 		// IgnoreJSON ignore json type
 		IgnoreJSON bool
-		// IgnoreFormURLEncoded ignore form url encoded type
-		IgnoreFormURLEncoded bool
-		// Decode decode function
-		Decode  Decode
-		Skipper cod.Skipper
+		// IgnoreFormURLEneltoned ignore form url eneltoned type
+		IgnoreFormURLEneltoned bool
+		// Deeltone deeltone function
+		Deeltone Deeltone
+		Skipper  elton.Skipper
 	}
 )
 
@@ -61,21 +61,21 @@ var (
 	}
 )
 
-// DefaultDecode default decode
-func DefaultDecode(c *cod.Context, data []byte) ([]byte, error) {
-	encoding := c.GetRequestHeader(cod.HeaderContentEncoding)
-	if encoding == cod.Gzip {
-		c.SetRequestHeader(cod.HeaderContentEncoding, "")
+// DefaultDeeltone default deeltone
+func DefaultDeeltone(c *elton.Context, data []byte) ([]byte, error) {
+	eneltoning := c.GetRequestHeader(elton.HeaderContentEncoding)
+	if eneltoning == elton.Gzip {
+		c.SetRequestHeader(elton.HeaderContentEncoding, "")
 		return doGunzip(data)
 	}
 	return data, nil
 }
 
 // NewDefault create a default body parser, default limit and only json parser
-func NewDefault() cod.Handler {
+func NewDefault() elton.Handler {
 	return New(Config{
-		IgnoreFormURLEncoded: true,
-		Decode:               DefaultDecode,
+		IgnoreFormURLEneltoned: true,
+		Deeltone:               DefaultDeeltone,
 	})
 }
 
@@ -90,16 +90,16 @@ func doGunzip(buf []byte) ([]byte, error) {
 }
 
 // New create a body parser
-func New(config Config) cod.Handler {
+func New(config Config) elton.Handler {
 	limit := defaultRequestBodyLimit
 	if config.Limit != 0 {
 		limit = config.Limit
 	}
 	skipper := config.Skipper
 	if skipper == nil {
-		skipper = cod.DefaultSkipper
+		skipper = elton.DefaultSkipper
 	}
-	return func(c *cod.Context) (err error) {
+	return func(c *elton.Context) (err error) {
 		if skipper(c) || c.RequestBody != nil {
 			return c.Next()
 		}
@@ -116,14 +116,14 @@ func New(config Config) cod.Handler {
 		if !valid {
 			return c.Next()
 		}
-		ct := c.GetRequestHeader(cod.HeaderContentType)
+		ct := c.GetRequestHeader(elton.HeaderContentType)
 		ctFields := strings.Split(ct, ";")
 		// 非json则跳过
 		isJSON := ctFields[0] == jsonContentType
-		isFormURLEncoded := ctFields[0] == formURLEncodedContentType
+		isFormURLEneltoned := ctFields[0] == formURLEneltonedContentType
 
-		// 如果不是 json 也不是 form url encoded，则跳过
-		if !isJSON && !isFormURLEncoded {
+		// 如果不是 json 也不是 form url eneltoned，则跳过
+		if !isJSON && !isFormURLEneltoned {
 			return c.Next()
 		}
 		// 如果数据类型json，而且中间件不处理，则跳过
@@ -131,8 +131,8 @@ func New(config Config) cod.Handler {
 			return c.Next()
 		}
 
-		// 如果数据类型form url encoded，而且中间件不处理，则跳过
-		if isFormURLEncoded && config.IgnoreFormURLEncoded {
+		// 如果数据类型form url eneltoned，而且中间件不处理，则跳过
+		if isFormURLEneltoned && config.IgnoreFormURLEneltoned {
 			return c.Next()
 		}
 
@@ -157,15 +157,15 @@ func New(config Config) cod.Handler {
 			}
 			return
 		}
-		if config.Decode != nil {
-			// 对提交数据做decode处理（如编码转换等）
-			body, err = config.Decode(c, body)
+		if config.Deeltone != nil {
+			// 对提交数据做deeltone处理（如编码转换等）
+			body, err = config.Deeltone(c, body)
 			if err != nil {
 				return
 			}
 		}
-		// 将form url encoded 数据转化为json
-		if isFormURLEncoded {
+		// 将form url eneltoned 数据转化为json
+		if isFormURLEneltoned {
 			data, err := url.ParseQuery(string(body))
 			if err != nil {
 				he := hes.Wrap(err)

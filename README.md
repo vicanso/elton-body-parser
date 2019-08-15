@@ -1,8 +1,8 @@
-# cod-body-parser
+# elton-body-parser
 
-[![Build Status](https://img.shields.io/travis/vicanso/cod-body-parser.svg?label=linux+build)](https://travis-ci.org/vicanso/cod-body-parser)
+[![Build Status](https://img.shields.io/travis/vicanso/elton-body-parser.svg?label=linux+build)](https://travis-ci.org/vicanso/elton-body-parser)
 
-Body parser for cod. It support `application/json` and `application/x-www-form-urlencoded` type, but `NewDefault` just support `application/json`.
+Body parser for elton. It support `application/json` and `application/x-www-form-urleneltoned` type, but `NewDefault` just support `application/json`.
 
 ```go
 package main
@@ -10,16 +10,16 @@ package main
 import (
 	"bytes"
 
-	"github.com/vicanso/cod"
-	bodyparser "github.com/vicanso/cod-body-parser"
+	"github.com/vicanso/elton"
+	bodyparser "github.com/vicanso/elton-body-parser"
 )
 
 func main() {
-	d := cod.New()
+	d := elton.New()
 
 	d.Use(bodyparser.NewDefault())
 
-	d.POST("/user/login", func(c *cod.Context) (err error) {
+	d.POST("/user/login", func(c *elton.Context) (err error) {
 		c.BodyBuffer = bytes.NewBuffer(c.RequestBody)
 		return
 	})
