@@ -1,4 +1,4 @@
-module github.com/vicanso/cod-body-parser
+module github.com/vicanso/elton-body-parser
 
 go 1.12
 
