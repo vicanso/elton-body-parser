@@ -39,17 +39,20 @@ const (
 type (
 	// Decode body decode function
 	Decode func(c *elton.Context, originalData []byte) (data []byte, err error)
+	// Validate body content type check validate function
+	Validate func(c *elton.Context) bool
+	// Decoder decoder
+	Decoder struct {
+		Decode   Decode
+		Validate Validate
+	}
 	// Config json parser config
 	Config struct {
 		// Limit the limit size of body
 		Limit int
-		// IgnoreJSON ignore json type
-		IgnoreJSON bool
-		// IgnoreFormURLEncoded ignore form url encoded type
-		IgnoreFormURLEncoded bool
-		// Decode decode function
-		Decode  Decode
-		Skipper elton.Skipper
+		// Decoders decode list
+		Decoders []*Decoder
+		Skipper  elton.Skipper
 	}
 )
 
@@ -59,24 +62,106 @@ var (
 		http.MethodPatch,
 		http.MethodPut,
 	}
+	errInvalidJSON = &hes.Error{
+		Category:   ErrCategory,
+		Message:    "invalid json format",
+		StatusCode: http.StatusBadRequest,
+	}
+	jsonBytes = []byte("{}[]")
 )
 
-// DefaultDecode default decode
-func DefaultDecode(c *elton.Context, data []byte) ([]byte, error) {
-	encoding := c.GetRequestHeader(elton.HeaderContentEncoding)
-	if encoding == elton.Gzip {
-		c.SetRequestHeader(elton.HeaderContentEncoding, "")
-		return doGunzip(data)
+// AddDecoder add decoder
+func (conf *Config) AddDecoder(decoder *Decoder) {
+	if len(conf.Decoders) == 0 {
+		conf.Decoders = make([]*Decoder, 0)
 	}
-	return data, nil
+	conf.Decoders = append(conf.Decoders, decoder)
+}
+
+// NewGzipDecoder new gzip decoder
+func NewGzipDecoder() *Decoder {
+	return &Decoder{
+		Validate: func(c *elton.Context) bool {
+			encoding := c.GetRequestHeader(elton.HeaderContentEncoding)
+			return encoding == elton.Gzip
+		},
+		Decode: func(c *elton.Context, originalData []byte) (data []byte, err error) {
+			c.SetRequestHeader(elton.HeaderContentEncoding, "")
+			return doGunzip(originalData)
+		},
+	}
+}
+
+// NewJSONDecoder new json decoder
+func NewJSONDecoder() *Decoder {
+	return &Decoder{
+		Validate: func(c *elton.Context) bool {
+			ct := c.GetRequestHeader(elton.HeaderContentType)
+			ctFields := strings.Split(ct, ";")
+			return ctFields[0] == jsonContentType
+		},
+		Decode: func(c *elton.Context, originalData []byte) (data []byte, err error) {
+			originalData = bytes.TrimSpace(originalData)
+			firstByte := originalData[0]
+			lastByte := originalData[len(originalData)-1]
+
+			if firstByte != jsonBytes[0] && firstByte != jsonBytes[2] {
+				err = errInvalidJSON
+				return
+			}
+			if firstByte == jsonBytes[0] && lastByte != jsonBytes[1] {
+				err = errInvalidJSON
+				return
+			}
+			if firstByte == jsonBytes[2] && lastByte != jsonBytes[3] {
+				err = errInvalidJSON
+				return
+			}
+			return originalData, nil
+		},
+	}
+}
+
+// NewFormURLEncodedDecoder new form url encode decoder
+func NewFormURLEncodedDecoder() *Decoder {
+	return &Decoder{
+		Validate: func(c *elton.Context) bool {
+			ct := c.GetRequestHeader(elton.HeaderContentType)
+			ctFields := strings.Split(ct, ";")
+			return ctFields[0] == formURLEncodedContentType
+		},
+		Decode: func(c *elton.Context, originalData []byte) (data []byte, err error) {
+			urlValues, err := url.ParseQuery(string(originalData))
+			if err != nil {
+				he := hes.Wrap(err)
+				he.Exception = true
+				return nil, he
+			}
+
+			arr := make([]string, 0, len(urlValues))
+			for key, values := range urlValues {
+				if len(values) < 2 {
+					arr = append(arr, fmt.Sprintf(`"%s":"%s"`, key, values[0]))
+					continue
+				}
+				tmpArr := []string{}
+				for _, v := range values {
+					tmpArr = append(tmpArr, `"`+v+`"`)
+				}
+				arr = append(arr, fmt.Sprintf(`"%s":[%s]`, key, strings.Join(tmpArr, ",")))
+			}
+			data = []byte("{" + strings.Join(arr, ",") + "}")
+			return data, nil
+		},
+	}
 }
 
 // NewDefault create a default body parser, default limit and only json parser
 func NewDefault() elton.Handler {
-	return New(Config{
-		IgnoreFormURLEncoded: true,
-		Decode:               DefaultDecode,
-	})
+	conf := Config{}
+	conf.AddDecoder(NewGzipDecoder())
+	conf.AddDecoder(NewJSONDecoder())
+	return New(conf)
 }
 
 // doGunzip gunzip
@@ -116,39 +201,25 @@ func New(config Config) elton.Handler {
 		if !valid {
 			return c.Next()
 		}
-		ct := c.GetRequestHeader(elton.HeaderContentType)
-		ctFields := strings.Split(ct, ";")
-		// 非json则跳过
-		isJSON := ctFields[0] == jsonContentType
-		isFormURLEncoded := ctFields[0] == formURLEncodedContentType
-
-		// 如果不是 json 也不是 form url encoded，则跳过
-		if !isJSON && !isFormURLEncoded {
-			return c.Next()
-		}
-		// 如果数据类型json，而且中间件不处理，则跳过
-		if isJSON && config.IgnoreJSON {
-			return c.Next()
-		}
-
-		// 如果数据类型form url encoded，而且中间件不处理，则跳过
-		if isFormURLEncoded && config.IgnoreFormURLEncoded {
-			return c.Next()
-		}
-
-		body, e := ioutil.ReadAll(c.Request.Body)
-		if e != nil {
-			// IO 读取失败的认为是 exception
-			err = &hes.Error{
-				Exception:  true,
-				StatusCode: http.StatusInternalServerError,
-				Message:    e.Error(),
-				Category:   ErrCategory,
-				Err:        e,
+		// 如果request body为空，则表示未读取数据
+		if c.RequestBody == nil {
+			body, e := ioutil.ReadAll(c.Request.Body)
+			if e != nil {
+				// IO 读取失败的认为是 exception
+				err = &hes.Error{
+					Exception:  true,
+					StatusCode: http.StatusInternalServerError,
+					Message:    e.Error(),
+					Category:   ErrCategory,
+					Err:        e,
+				}
+				return
 			}
-			return
+			c.Request.Body.Close()
+			c.RequestBody = body
 		}
-		c.Request.Body.Close()
+		body := c.RequestBody
+
 		if limit > 0 && len(body) > limit {
 			err = &hes.Error{
 				StatusCode: http.StatusBadRequest,
@@ -157,37 +228,27 @@ func New(config Config) elton.Handler {
 			}
 			return
 		}
-		if config.Decode != nil {
-			// 对提交数据做decode处理（如解压，编码转换等）
-			body, err = config.Decode(c, body)
+
+		decodeList := make([]Decode, 0)
+		for _, decoder := range config.Decoders {
+			if decoder.Validate(c) {
+				decodeList = append(decodeList, decoder.Decode)
+				break
+			}
+		}
+		// 没有符合条件的解码
+		if len(decodeList) == 0 {
+			return c.Next()
+		}
+
+		for _, decode := range decodeList {
+			body, err = decode(c, body)
 			if err != nil {
 				return
 			}
 		}
-		// 将form url encoded 数据转化为json
-		if isFormURLEncoded {
-			data, err := url.ParseQuery(string(body))
-			if err != nil {
-				he := hes.Wrap(err)
-				he.Exception = true
-				return he
-			}
-
-			arr := make([]string, 0, len(data))
-			for key, values := range data {
-				if len(values) < 2 {
-					arr = append(arr, fmt.Sprintf(`"%s":"%s"`, key, values[0]))
-					continue
-				}
-				tmpArr := []string{}
-				for _, v := range values {
-					tmpArr = append(tmpArr, `"`+v+`"`)
-				}
-				arr = append(arr, fmt.Sprintf(`"%s":[%s]`, key, strings.Join(tmpArr, ",")))
-			}
-			body = []byte("{" + strings.Join(arr, ",") + "}")
-		}
 		c.RequestBody = body
+
 		return c.Next()
 	}
 }

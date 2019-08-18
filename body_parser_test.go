@@ -40,7 +40,8 @@ func NewErrorReadCloser(err error) io.ReadCloser {
 	return r
 }
 
-func TestDefaultDecoded(t *testing.T) {
+func TestGzipDecoder(t *testing.T) {
+	gzipDecoder := NewGzipDecoder()
 	assert := assert.New(t)
 	originalBuf := []byte("abcdabcdabcd")
 	var b bytes.Buffer
@@ -50,15 +51,51 @@ func TestDefaultDecoded(t *testing.T) {
 	w.Close()
 
 	c := elton.NewContext(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
-
-	buf, err := DefaultDcode(c, b.Bytes())
-	assert.Nil(err)
-	assert.Equal(b.Bytes(), buf)
+	assert.False(gzipDecoder.Validate(c))
 
 	c.SetRequestHeader(elton.HeaderContentEncoding, elton.Gzip)
-	buf, err = DefaultDcode(c, b.Bytes())
+	assert.True(gzipDecoder.Validate(c))
+	buf, err := gzipDecoder.Decode(c, b.Bytes())
 	assert.Nil(err)
 	assert.Equal(originalBuf, buf)
+
+	_, err = gzipDecoder.Decode(c, []byte("ab"))
+	assert.NotNil(err)
+}
+
+func TestJSONDecoder(t *testing.T) {
+	assert := assert.New(t)
+	jsonDecoder := NewJSONDecoder()
+	c := elton.NewContext(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
+	assert.False(jsonDecoder.Validate(c))
+	c.SetRequestHeader(elton.HeaderContentType, elton.MIMEApplicationJSON)
+	assert.True(jsonDecoder.Validate(c))
+
+	buf := []byte(`{"a": 1}`)
+	data, err := jsonDecoder.Decode(c, buf)
+	assert.Nil(err)
+	assert.Equal(buf, data)
+	_, err = jsonDecoder.Decode(c, []byte("abcd"))
+	assert.Equal(errInvalidJSON, err)
+
+	_, err = jsonDecoder.Decode(c, []byte("{abcd"))
+	assert.Equal(errInvalidJSON, err)
+
+	_, err = jsonDecoder.Decode(c, []byte("[abcd"))
+	assert.Equal(errInvalidJSON, err)
+}
+
+func TestFormURLEncodedDecoder(t *testing.T) {
+	assert := assert.New(t)
+	formURLEncodedDecoder := NewFormURLEncodedDecoder()
+	c := elton.NewContext(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
+	assert.False(formURLEncodedDecoder.Validate(c))
+	c.SetRequestHeader(elton.HeaderContentType, "application/x-www-form-urlencoded; charset=UTF-8")
+	assert.True(formURLEncodedDecoder.Validate(c))
+
+	data, err := formURLEncodedDecoder.Decode(c, []byte("a=1&b=2"))
+	assert.Nil(err)
+	assert.Equal(17, len(data))
 }
 
 func TestBodyParser(t *testing.T) {
@@ -160,48 +197,11 @@ func TestBodyParser(t *testing.T) {
 		assert.Equal(err.Error(), "category=elton-body-parser, message=request body is 3 bytes, it should be <= 1")
 	})
 
-	t.Run("ignore json and content type is json", func(t *testing.T) {
-		assert := assert.New(t)
-		bodyParser := New(Config{
-			IgnoreJSON: true,
-		})
-		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader("abc"))
-		req.Header.Set(elton.HeaderContentType, "application/json")
-		c := elton.NewContext(nil, req)
-		done := false
-		c.Next = func() error {
-			done = true
-			return nil
-		}
-		err := bodyParser(c)
-		assert.Nil(err)
-		assert.True(done)
-		assert.Equal(len(c.RequestBody), 0)
-	})
-
-	t.Run("ignore form url encoded and content type is form url encoded", func(t *testing.T) {
-		assert := assert.New(t)
-		bodyParser := New(Config{
-			IgnoreFormURLEncoded: true,
-		})
-		body := `name=tree.xie&type=1`
-		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
-		req.Header.Set(elton.HeaderContentType, "application/x-www-form-urlencoded")
-		c := elton.NewContext(nil, req)
-		done := false
-		c.Next = func() error {
-			done = true
-			return nil
-		}
-		err := bodyParser(c)
-		assert.Nil(err)
-		assert.True(done)
-		assert.Equal(len(c.RequestBody), 0)
-	})
-
 	t.Run("parse json success", func(t *testing.T) {
 		assert := assert.New(t)
-		bodyParser := New(Config{})
+		conf := Config{}
+		conf.AddDecoder(NewJSONDecoder())
+		bodyParser := New(conf)
 		body := `{"name": "tree.xie"}`
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
 		req.Header.Set(elton.HeaderContentType, "application/json")
@@ -219,16 +219,49 @@ func TestBodyParser(t *testing.T) {
 		assert.True(done)
 	})
 
+	t.Run("parse json(gzip) success", func(t *testing.T) {
+		assert := assert.New(t)
+		conf := Config{}
+		conf.AddDecoder(NewGzipDecoder())
+		conf.AddDecoder(NewJSONDecoder())
+		bodyParser := New(conf)
+		originalBuf := []byte(`{"name": "tree.xie"}`)
+		var b bytes.Buffer
+		w, _ := gzip.NewWriterLevel(&b, 9)
+		_, err := w.Write(originalBuf)
+		assert.Nil(err)
+		w.Close()
+
+		req := httptest.NewRequest("POST", "https://aslant.site/", bytes.NewReader(b.Bytes()))
+		req.Header.Set(elton.HeaderContentType, "application/json")
+		req.Header.Set(elton.HeaderContentEncoding, "gzip")
+		c := elton.NewContext(nil, req)
+		done := false
+		c.Next = func() error {
+			done = true
+			if !bytes.Equal(c.RequestBody, originalBuf) {
+				return hes.New("request body is invalid")
+			}
+			return nil
+		}
+		err = bodyParser(c)
+		assert.Nil(err)
+		assert.True(done)
+	})
+
 	t.Run("decode data success", func(t *testing.T) {
 		assert := assert.New(t)
-		bodyParser := New(Config{
-			Decode: func(c *elton.Context, data []byte) ([]byte, error) {
-				if strings.HasSuffix(c.GetRequestHeader(elton.HeaderContentType), "charset=base64") {
-					return base64.RawStdEncoding.DecodeString(string(data))
-				}
-				return data, nil
+		conf := Config{}
+		conf.AddDecoder(&Decoder{
+			Validate: func(c *elton.Context) bool {
+				return c.GetRequestHeader(elton.HeaderContentType) == "application/json;charset=base64"
+			},
+			Decode: func(c *elton.Context, originalData []byte) (data []byte, err error) {
+				return base64.RawStdEncoding.DecodeString(string(originalData))
 			},
 		})
+
+		bodyParser := New(conf)
 		body := `{"name": "tree.xie"}`
 		b64 := base64.RawStdEncoding.EncodeToString([]byte(body))
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(b64))
@@ -249,7 +282,9 @@ func TestBodyParser(t *testing.T) {
 
 	t.Run("parse form url encoded success", func(t *testing.T) {
 		assert := assert.New(t)
-		bodyParser := New(Config{})
+		conf := Config{}
+		conf.AddDecoder(NewFormURLEncodedDecoder())
+		bodyParser := New(conf)
 		body := `name=tree.xie&type=1&type=2`
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
 		req.Header.Set(elton.HeaderContentType, "application/x-www-form-urlencoded")

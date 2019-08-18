@@ -27,3 +27,43 @@ func main() {
 	d.ListenAndServe(":7001")
 }
 ```
+
+## API
+
+### NewDefault
+
+create a new default body parser middleware. It include gzip and json decoder.
+
+```go
+d.Use(bodyparser.NewDefault())
+```
+
+### NewGzipDecoder
+
+create a new gzip decoder
+
+```go
+conf := bodyparser.Config{}
+conf.AddDecoder(NewGzipDecoder())
+d.Use(bodyparser.New(conf))
+```
+
+### NewJSONDecoder
+
+create a new json decoder
+
+```go
+conf := bodyparser.Config{}
+conf.AddDecoder(NewJSONDecoder())
+d.Use(bodyparser.New(conf))
+```
+
+### NewFormURLEncodedDecoder
+
+create a new form url encoded decoder
+
+```go
+conf := bodyparser.Config{}
+conf.AddDecoder(NewFormURLEncodedDecoder())
+d.Use(bodyparser.New(conf))
+```
