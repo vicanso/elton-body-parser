@@ -40,7 +40,7 @@ func NewErrorReadCloser(err error) io.ReadCloser {
 	return r
 }
 
-func TestDefaultDeeltone(t *testing.T) {
+func TestDefaultDecoded(t *testing.T) {
 	assert := assert.New(t)
 	originalBuf := []byte("abcdabcdabcd")
 	var b bytes.Buffer
@@ -51,12 +51,12 @@ func TestDefaultDeeltone(t *testing.T) {
 
 	c := elton.NewContext(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
 
-	buf, err := DefaultDeeltone(c, b.Bytes())
+	buf, err := DefaultDcode(c, b.Bytes())
 	assert.Nil(err)
 	assert.Equal(b.Bytes(), buf)
 
 	c.SetRequestHeader(elton.HeaderContentEncoding, elton.Gzip)
-	buf, err = DefaultDeeltone(c, b.Bytes())
+	buf, err = DefaultDcode(c, b.Bytes())
 	assert.Nil(err)
 	assert.Equal(originalBuf, buf)
 }
@@ -179,14 +179,14 @@ func TestBodyParser(t *testing.T) {
 		assert.Equal(len(c.RequestBody), 0)
 	})
 
-	t.Run("ignore form url eneltoned and content type is form url eneltoned", func(t *testing.T) {
+	t.Run("ignore form url encoded and content type is form url encoded", func(t *testing.T) {
 		assert := assert.New(t)
 		bodyParser := New(Config{
-			IgnoreFormURLEneltoned: true,
+			IgnoreFormURLEncoded: true,
 		})
 		body := `name=tree.xie&type=1`
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
-		req.Header.Set(elton.HeaderContentType, "application/x-www-form-urleneltoned")
+		req.Header.Set(elton.HeaderContentType, "application/x-www-form-urlencoded")
 		c := elton.NewContext(nil, req)
 		done := false
 		c.Next = func() error {
@@ -219,10 +219,10 @@ func TestBodyParser(t *testing.T) {
 		assert.True(done)
 	})
 
-	t.Run("deeltone data success", func(t *testing.T) {
+	t.Run("decode data success", func(t *testing.T) {
 		assert := assert.New(t)
 		bodyParser := New(Config{
-			Deeltone: func(c *elton.Context, data []byte) ([]byte, error) {
+			Decode: func(c *elton.Context, data []byte) ([]byte, error) {
 				if strings.HasSuffix(c.GetRequestHeader(elton.HeaderContentType), "charset=base64") {
 					return base64.RawStdEncoding.DecodeString(string(data))
 				}
@@ -247,12 +247,12 @@ func TestBodyParser(t *testing.T) {
 		assert.True(done)
 	})
 
-	t.Run("parse form url eneltoned success", func(t *testing.T) {
+	t.Run("parse form url encoded success", func(t *testing.T) {
 		assert := assert.New(t)
 		bodyParser := New(Config{})
 		body := `name=tree.xie&type=1&type=2`
 		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
-		req.Header.Set(elton.HeaderContentType, "application/x-www-form-urleneltoned")
+		req.Header.Set(elton.HeaderContentType, "application/x-www-form-urlencoded")
 		c := elton.NewContext(nil, req)
 		done := false
 		c.Next = func() error {
