@@ -61,8 +61,8 @@ var (
 	}
 )
 
-// DefaultDcode default decode
-func DefaultDcode(c *elton.Context, data []byte) ([]byte, error) {
+// DefaultDecode default decode
+func DefaultDecode(c *elton.Context, data []byte) ([]byte, error) {
 	encoding := c.GetRequestHeader(elton.HeaderContentEncoding)
 	if encoding == elton.Gzip {
 		c.SetRequestHeader(elton.HeaderContentEncoding, "")
@@ -75,7 +75,7 @@ func DefaultDcode(c *elton.Context, data []byte) ([]byte, error) {
 func NewDefault() elton.Handler {
 	return New(Config{
 		IgnoreFormURLEncoded: true,
-		Decode:               DefaultDcode,
+		Decode:               DefaultDecode,
 	})
 }
 
