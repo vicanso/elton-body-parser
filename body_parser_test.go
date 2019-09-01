@@ -75,6 +75,12 @@ func TestJSONDecoder(t *testing.T) {
 	data, err := jsonDecoder.Decode(c, buf)
 	assert.Nil(err)
 	assert.Equal(buf, data)
+
+	buf = []byte(``)
+	data, err = jsonDecoder.Decode(c, buf)
+	assert.Nil(err)
+	assert.Nil(data)
+
 	_, err = jsonDecoder.Decode(c, []byte("abcd"))
 	assert.Equal(errInvalidJSON, err)
 

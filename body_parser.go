@@ -102,6 +102,9 @@ func NewJSONDecoder() *Decoder {
 		},
 		Decode: func(c *elton.Context, originalData []byte) (data []byte, err error) {
 			originalData = bytes.TrimSpace(originalData)
+			if len(originalData) == 0 {
+				return nil, nil
+			}
 			firstByte := originalData[0]
 			lastByte := originalData[len(originalData)-1]
 
