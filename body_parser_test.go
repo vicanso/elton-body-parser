@@ -81,6 +81,9 @@ func TestJSONDecoder(t *testing.T) {
 	assert.Nil(err)
 	assert.Nil(data)
 
+	_, err = jsonDecoder.Decode(c, []byte("{"))
+	assert.Equal(errInvalidJSON, err)
+
 	_, err = jsonDecoder.Decode(c, []byte("abcd"))
 	assert.Equal(errInvalidJSON, err)
 
@@ -126,6 +129,26 @@ func TestBodyParser(t *testing.T) {
 		assert.Nil(err)
 		assert.True(done)
 		assert.Equal(len(c.RequestBody), 0)
+	})
+
+	t.Run("request body content type is not json", func(t *testing.T) {
+		assert := assert.New(t)
+		bodyParser := NewDefault()
+
+		body := `<xml>xxx</xml>`
+		req := httptest.NewRequest("POST", "https://aslant.site/", strings.NewReader(body))
+		req.Header.Set(elton.HeaderContentType, "application/xml")
+		c := elton.NewContext(nil, req)
+		done := false
+		c.Next = func() error {
+			done = true
+			return nil
+		}
+		err := bodyParser(c)
+
+		assert.Nil(err)
+		assert.True(done)
+		assert.Nil(c.RequestBody)
 	})
 
 	t.Run("request body is not nil", func(t *testing.T) {
@@ -288,7 +311,9 @@ func TestBodyParser(t *testing.T) {
 
 	t.Run("parse form url encoded success", func(t *testing.T) {
 		assert := assert.New(t)
-		conf := Config{}
+		conf := Config{
+			ContentTypeValidate: DefaultJSONAndFormContentTypeValidate,
+		}
 		conf.AddDecoder(NewFormURLEncodedDecoder())
 		bodyParser := New(conf)
 		body := `name=tree.xie&type=1&type=2`

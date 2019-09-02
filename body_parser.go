@@ -51,8 +51,9 @@ type (
 		// Limit the limit size of body
 		Limit int
 		// Decoders decode list
-		Decoders []*Decoder
-		Skipper  elton.Skipper
+		Decoders            []*Decoder
+		Skipper             elton.Skipper
+		ContentTypeValidate Validate
 	}
 )
 
@@ -159,6 +160,21 @@ func NewFormURLEncodedDecoder() *Decoder {
 	}
 }
 
+// DefaultJSONContentTypeValidate default json content type validate
+func DefaultJSONContentTypeValidate(c *elton.Context) bool {
+	ct := c.GetRequestHeader(elton.HeaderContentType)
+	return strings.HasPrefix(ct, jsonContentType)
+}
+
+// DefaultJSONAndFormContentTypeValidate default json and form content type validate
+func DefaultJSONAndFormContentTypeValidate(c *elton.Context) bool {
+	ct := c.GetRequestHeader(elton.HeaderContentType)
+	if strings.HasPrefix(ct, jsonContentType) {
+		return true
+	}
+	return strings.HasPrefix(ct, formURLEncodedContentType)
+}
+
 // NewDefault create a default body parser, default limit and only json parser
 func NewDefault() elton.Handler {
 	conf := Config{}
@@ -187,8 +203,12 @@ func New(config Config) elton.Handler {
 	if skipper == nil {
 		skipper = elton.DefaultSkipper
 	}
+	contentTypeValidate := config.ContentTypeValidate
+	if contentTypeValidate == nil {
+		contentTypeValidate = DefaultJSONContentTypeValidate
+	}
 	return func(c *elton.Context) (err error) {
-		if skipper(c) || c.RequestBody != nil {
+		if skipper(c) || c.RequestBody != nil || !contentTypeValidate(c) {
 			return c.Next()
 		}
 		method := c.Request.Method
