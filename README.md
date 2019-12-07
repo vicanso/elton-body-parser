@@ -24,7 +24,7 @@ func main() {
 		return
 	})
 
-	d.ListenAndServe(":7001")
+	d.ListenAndServe(":3000")
 }
 ```
 
@@ -44,7 +44,7 @@ create a new gzip decoder
 
 ```go
 conf := bodyparser.Config{}
-conf.AddDecoder(NewGzipDecoder())
+conf.AddDecoder(bodyparser.NewGzipDecoder())
 d.Use(bodyparser.New(conf))
 ```
 
@@ -54,7 +54,7 @@ create a new json decoder
 
 ```go
 conf := bodyparser.Config{}
-conf.AddDecoder(NewJSONDecoder())
+conf.AddDecoder(bodyparser.NewJSONDecoder())
 d.Use(bodyparser.New(conf))
 ```
 
@@ -63,7 +63,9 @@ d.Use(bodyparser.New(conf))
 create a new form url encoded decoder
 
 ```go
-conf := bodyparser.Config{}
-conf.AddDecoder(NewFormURLEncodedDecoder())
+conf := bodyparser.Config{
+	ContentTypeValidate: bodyparser.DefaultJSONAndFormContentTypeValidate
+}
+conf.AddDecoder(bodyparser.NewFormURLEncodedDecoder())
 d.Use(bodyparser.New(conf))
 ```
