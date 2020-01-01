@@ -8,16 +8,16 @@ import (
 )
 
 func main() {
-	d := elton.New()
+	e := elton.New()
 
-	d.Use(bodyparser.NewDefault())
+	e.Use(bodyparser.NewDefault())
 
-	d.POST("/user/login", func(c *elton.Context) (err error) {
+	e.POST("/user/login", func(c *elton.Context) (err error) {
 		c.BodyBuffer = bytes.NewBuffer(c.RequestBody)
 		return
 	})
 
-	err := d.ListenAndServe(":3000")
+	err := e.ListenAndServe(":3000")
 	if err != nil {
 		panic(err)
 	}

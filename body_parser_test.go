@@ -223,7 +223,7 @@ func TestBodyParser(t *testing.T) {
 		c := elton.NewContext(nil, req)
 		err := bodyParser(c)
 		assert.NotNil(err)
-		assert.Equal(err.Error(), "category=elton-body-parser, message=request body is 3 bytes, it should be <= 1")
+		assert.Equal(err.Error(), "category=elton-body-parser, message=request body is too large, it should be <= 1")
 	})
 
 	t.Run("parse json success", func(t *testing.T) {

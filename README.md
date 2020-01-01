@@ -15,16 +15,16 @@ import (
 )
 
 func main() {
-	d := elton.New()
+	e := elton.New()
 
-	d.Use(bodyparser.NewDefault())
+	e.Use(bodyparser.NewDefault())
 
-	d.POST("/user/login", func(c *elton.Context) (err error) {
+	e.POST("/user/login", func(c *elton.Context) (err error) {
 		c.BodyBuffer = bytes.NewBuffer(c.RequestBody)
 		return
 	})
 
-	d.ListenAndServe(":3000")
+	e.ListenAndServe(":3000")
 }
 ```
 
@@ -35,7 +35,7 @@ func main() {
 create a new default body parser middleware. It include gzip and json decoder.
 
 ```go
-d.Use(bodyparser.NewDefault())
+e.Use(bodyparser.NewDefault())
 ```
 
 ### NewGzipDecoder
@@ -45,7 +45,7 @@ create a new gzip decoder
 ```go
 conf := bodyparser.Config{}
 conf.AddDecoder(bodyparser.NewGzipDecoder())
-d.Use(bodyparser.New(conf))
+e.Use(bodyparser.New(conf))
 ```
 
 ### NewJSONDecoder
@@ -55,7 +55,7 @@ create a new json decoder
 ```go
 conf := bodyparser.Config{}
 conf.AddDecoder(bodyparser.NewJSONDecoder())
-d.Use(bodyparser.New(conf))
+e.Use(bodyparser.New(conf))
 ```
 
 ### NewFormURLEncodedDecoder
@@ -67,5 +67,5 @@ conf := bodyparser.Config{
 	ContentTypeValidate: bodyparser.DefaultJSONAndFormContentTypeValidate
 }
 conf.AddDecoder(bodyparser.NewFormURLEncodedDecoder())
-d.Use(bodyparser.New(conf))
+e.Use(bodyparser.New(conf))
 ```

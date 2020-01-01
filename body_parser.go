@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -193,6 +194,52 @@ func doGunzip(buf []byte) ([]byte, error) {
 	return ioutil.ReadAll(r)
 }
 
+type maxBytesReader struct {
+	r   io.ReadCloser // underlying reader
+	n   int64         // max bytes remaining
+	err error         // sticky error
+}
+
+func (l *maxBytesReader) Read(p []byte) (n int, err error) {
+	if l.err != nil {
+		return 0, l.err
+	}
+	if len(p) == 0 {
+		return 0, nil
+	}
+	// If they asked for a 32KB byte read but only 5 bytes are
+	// remaining, no need to read 32KB. 6 bytes will answer the
+	// question of the whether we hit the limit or go past it.
+	if int64(len(p)) > l.n+1 {
+		p = p[:l.n+1]
+	}
+	n, err = l.r.Read(p)
+
+	if int64(n) <= l.n {
+		l.n -= int64(n)
+		l.err = err
+		return n, err
+	}
+
+	l.err = fmt.Errorf("request body is too large, it should be <= %d", l.n)
+
+	n = int(l.n)
+	l.n = 0
+
+	return n, l.err
+}
+
+func (l *maxBytesReader) Close() error {
+	return l.r.Close()
+}
+
+func MaxBytesReader(r io.ReadCloser, n int64) *maxBytesReader {
+	return &maxBytesReader{
+		n: n,
+		r: r,
+	}
+}
+
 // New create a body parser
 func New(config Config) elton.Handler {
 	limit := defaultRequestBodyLimit
@@ -226,7 +273,12 @@ func New(config Config) elton.Handler {
 		}
 		// 如果request body为空，则表示未读取数据
 		if c.RequestBody == nil {
-			body, e := ioutil.ReadAll(c.Request.Body)
+			r := c.Request.Body
+			if limit > 0 {
+				r = MaxBytesReader(r, int64(limit))
+			}
+			defer r.Close()
+			body, e := ioutil.ReadAll(r)
 			if e != nil {
 				// IO 读取失败的认为是 exception
 				err = &hes.Error{
@@ -242,15 +294,6 @@ func New(config Config) elton.Handler {
 			c.RequestBody = body
 		}
 		body := c.RequestBody
-
-		if limit > 0 && len(body) > limit {
-			err = &hes.Error{
-				StatusCode: http.StatusBadRequest,
-				Message:    fmt.Sprintf("request body is %d bytes, it should be <= %d", len(body), limit),
-				Category:   ErrCategory,
-			}
-			return
-		}
 
 		decodeList := make([]Decode, 0)
 		for _, decoder := range config.Decoders {
