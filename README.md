@@ -1,5 +1,7 @@
 # elton-body-parser
 
+The middleware has been archived, please use the middleware of [elton](https://github.com/vicanso/elton).
+
 [![Build Status](https://img.shields.io/travis/vicanso/elton-body-parser.svg?label=linux+build)](https://travis-ci.org/vicanso/elton-body-parser)
 
 Body parser for elton. It support `application/json` and `application/x-www-form-urlencoded` type, but `NewDefault` just support `application/json`.
